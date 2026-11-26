@@ -3,6 +3,7 @@ import classnames from 'classnames';
 import { ChatMessage } from '@/types/chat';
 import MarkdownText from '@/components/MarkdownText';
 import BrandMark from '@/components/BrandMark';
+import TraceTimeline from '@/components/TraceTimeline';
 import styles from './index.module.scss';
 
 interface Props {
@@ -21,7 +22,6 @@ export default function MessageBubble({ message, streaming }: Props) {
   }
 
   const isUser = message.role === 'user';
-  const isDb = message.mode === 'chat_with_db_execute';
 
   return (
     <View
@@ -48,15 +48,18 @@ export default function MessageBubble({ message, streaming }: Props) {
             <Text className={styles.userText}>{message.content}</Text>
           ) : (
             <View className={styles.assistantContent}>
+              {!!message.trace?.length && (
+                <TraceTimeline events={message.trace} running={!!streaming} />
+              )}
               {message.content ? (
                 <MarkdownText content={message.content} />
-              ) : streaming ? (
+              ) : streaming && !message.trace?.length ? (
                 <View className={styles.typing}>
                   <View className={styles.dot} />
                   <View className={styles.dot} />
                   <View className={styles.dot} />
                   <Text className={styles.typingHint}>
-                    {isDb ? '正在查询数据库…' : '正在检索知识库…'}
+                    正在连接问答服务…
                   </Text>
                 </View>
               ) : null}

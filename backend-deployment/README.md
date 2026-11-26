@@ -32,6 +32,16 @@
 
 在另一个终端进入 miniapp，执行 npm.cmd ci --legacy-peer-deps 和 npm.cmd run dev:h5，打开 http://localhost:10086。
 
+## ReAct 调试台
+
+本机调试时，用 `.ackend-deploymentscriptsstart_local.ps1 -DebugConsole` 启动后端。如果 15670 上已经运行了 DB-GPT，需要重启该进程，以便读取调试开关。
+
+在 H5 打开 [ReAct 调试台](http://localhost:10086/#/pages/debug/index)，也可以在「我的」页面进入。控制台与咨询页使用同一个 `POST /api/v1/chat/admission-react` 接口。控制台按轮次显示实际发送给模型的系统提示、会话历史、工具回填、公开输出、原生推理字段，以及 SQL 或 GraphRAG 的工具返回。原生推理单独记录在本次调试会话中，仅供本机查看，刷新后清空。
+
+如果 Taro 启动时切换了端口，使用终端显示的本机预览地址进入调试台。
+
+咨询页显示每轮任务摘要和最终答案。模型服务缺少原生推理字段时，循环仍会处理工具调用和最终答案。
+
 ## 项目来源
 
 - graphrag 来自原 GraphRAG 仓库的 d5b90fb，保留原作者的检索实现。 [原仓库](https://github.com/Estrella-cloud/whu-admissions-graphrag)

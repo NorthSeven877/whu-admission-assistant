@@ -73,7 +73,7 @@ export interface StreamCallbacks {
 
 // 增量 UTF-8 解码器：优先用 TextDecoder，真机 JS 环境缺失时降级为手动解码
 // （需处理多字节字符被分块截断的情况）
-function createUtf8Decoder(): { decode: (buf: ArrayBuffer, opts?: { stream?: boolean }) => string } {
+export function createUtf8Decoder(): { decode: (buf: ArrayBuffer, opts?: { stream?: boolean }) => string } {
   if (typeof TextDecoder !== 'undefined') {
     const td = new TextDecoder('utf-8');
     return { decode: (buf) => td.decode(buf, { stream: true }) };

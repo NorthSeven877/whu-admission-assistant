@@ -1,3 +1,5 @@
+import type { TraceEvent } from './admission';
+
 export type ChatMode = 'chat_knowledge' | 'chat_with_db_execute' | 'chat_with_db_react';
 
 export interface ChatMessage {
@@ -7,6 +9,8 @@ export interface ChatMessage {
   mode: ChatMode;
   timestamp: number;
   error?: boolean;
+  offline?: boolean;
+  trace?: TraceEvent[];
 }
 
 export interface ChatSession {

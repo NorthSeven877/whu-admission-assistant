@@ -1,3 +1,5 @@
+﻿param([switch]$DebugConsole, [switch]$Restart)
+
 $ErrorActionPreference = 'Stop'
 $packageRoot = Split-Path -Parent $PSScriptRoot
 $workspace = Split-Path -Parent $packageRoot
@@ -48,6 +50,38 @@ function Start-LocalServer(
     throw "$Name 启动超时。日志 $errorLog"
 }
 
+function Stop-ProjectDbGpt {
+    $dbgptExe = Join-Path $dbgptRoot '.venv\Scripts\dbgpt.exe'
+    $commandPattern = '(?:^|\s)"?' + [regex]::Escape($dbgptExe) +
+        '"?\s+start\s+webserver\s+--config\s+"?configs[/\\]whu-qwen\.toml"?(?:\s|$)'
+    $projectProcesses = @(Get-CimInstance Win32_Process -Filter "Name='dbgpt.exe' OR Name='python.exe'" |
+        Where-Object { $_.CommandLine -match $commandPattern })
+    $projectIds = @($projectProcesses | ForEach-Object { $_.ProcessId })
+    $listeners = @(Get-NetTCPConnection -LocalPort 15670 -State Listen -ErrorAction SilentlyContinue)
+    if (($listeners | Where-Object { $_.OwningProcess -notin $projectIds }) -or
+        ($listeners.Count -eq 0 -and (Test-LocalPort 15670))) {
+        throw '15670 端口被其他进程占用，无法重启本项目的 DB-GPT。'
+    }
+
+    foreach ($root in ($projectProcesses | Where-Object { $_.ParentProcessId -notin $projectIds })) {
+        $current = Get-CimInstance Win32_Process -Filter "ProcessId=$($root.ProcessId)"
+        if (-not $current -or $current.CreationDate -ne $root.CreationDate -or
+            $current.CommandLine -notmatch $commandPattern) { continue }
+
+        # The DB-GPT launcher owns its Python server and model worker processes.
+        & taskkill.exe /PID $root.ProcessId /T /F | Out-Host
+        if ($LASTEXITCODE -ne 0 -and (Get-Process -Id $root.ProcessId -ErrorAction SilentlyContinue)) {
+            throw '关闭本项目的 DB-GPT 进程失败。'
+        }
+    }
+
+    $deadline = (Get-Date).AddSeconds(15)
+    while (Test-LocalPort 15670) {
+        if ((Get-Date) -ge $deadline) { throw 'DB-GPT 未及时释放 15670 端口。' }
+        Start-Sleep -Milliseconds 300
+    }
+}
+
 if (Test-Path (Join-Path $pgData 'PG_VERSION')) {
     $pgCtl = (Get-Command pg_ctl.exe -ErrorAction Stop).Source
     & $pgCtl status -D $pgData | Out-Null
@@ -72,12 +106,20 @@ $env:WHU_LLM = $env:WHU_QWEN_API_BASE.TrimEnd('/') + '/chat/completions'
 $env:WHU_LLM_MODEL = 'qwen3.8-flash-next'
 $env:WHU_LLM_VERIFY_SSL = 'false'
 $env:WHU_LLM_API_KEY = $env:WHU_QWEN_API_KEY
+if ($DebugConsole) { $env:WHU_REACT_DEBUG = '1' }
 $env:WHU_HOST = '127.0.0.1'
 $env:WHU_GRAPH_RETRIEVE_URL = 'http://127.0.0.1:8090/api/retrieve'
 Start-LocalServer -Name 'graphrag' -Executable $python `
     -ServerArgs @('app/app.py') -Directory $graphRoot -Port 8090
 if ((Invoke-RestMethod -Uri 'http://127.0.0.1:8090/api/stats' -TimeoutSec 10).chunks -le 0) {
     throw 'GraphRAG 索引尚未建立。'
+}
+if ($Restart) {
+    $route = Join-Path $dbgptRoot 'packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/whu_react.py'
+    & $python -m py_compile $route
+    if ($LASTEXITCODE -ne 0) { throw '后端代码有语法错误，请修正后再重启。' }
+    Write-Host '正在重启本项目的 DB-GPT…'
+    Stop-ProjectDbGpt
 }
 Start-LocalServer -Name 'dbgpt' -Executable (Join-Path $dbgptRoot '.venv/Scripts/dbgpt.exe') `
     -ServerArgs @('start', 'webserver', '--config', 'configs/whu-qwen.toml') -Directory $dbgptRoot -Port 15670

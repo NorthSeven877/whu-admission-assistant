@@ -1,0 +1,88 @@
+
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 24PX clamp(14PX, 3vw, 44PX);
+  background: #eff3f0;
+  color: #20362d;
+}
+.header, .layout { max-width: 1440PX; margin: 0 auto; }
+.header { display: flex; align-items: end; justify-content: space-between; gap: 14PX; margin-bottom: 18PX; }
+.product, .title { display: block; }
+.product { color: #567264; font-size: 13PX; margin-bottom: 4PX; }
+.title { font-size: 29PX; font-weight: 700; letter-spacing: -0.5PX; }
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16PX;
+  height: max(480PX, calc(100vh - 120PX));
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1PX solid #d9e3dc;
+  border-radius: 12PX;
+  background: white;
+  overflow: hidden;
+}
+.panelHeader { display: flex; justify-content: space-between; align-items: center; padding: 12PX 15PX; min-height: 34PX; border-bottom: 1PX solid #e3ebe5; }
+.panelTitle { flex-shrink: 0; font-size: 15PX; font-weight: 700; }
+.traceStatus, .turnStatus, .placeholder { color: #53675c; font-size: 12PX; }
+.conversation, .trace { flex: 1; overflow: auto; min-height: 0; padding: 14PX; }
+.turn { margin-bottom: 16PX; }
+.question, .selected {
+  display: flex;
+  align-items: baseline;
+  gap: 8PX;
+  justify-content: space-between;
+  width: 100%;
+  white-space: normal;
+  padding: 10PX;
+  font-size: 14PX;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6PX;
+  border: 1PX solid #dce7df;
+  color: #203a2e;
+  background: #f6f8f6;
+  margin-bottom: 8PX;
+}
+.selected { border-color: #7ea692; background: #e7f2ea; }
+.turnStatus { flex: 0 0 auto; }
+.error { color: #9a3028; font-size: 13PX; }
+.composer { display: flex; align-items: end; gap: 8PX; padding: 12PX; border-top: 1PX solid #e3ebe5; }
+.input {
+  box-sizing: border-box;
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 75PX;
+  padding: 8PX;
+  border: 1PX solid #ccd9ce;
+  border-radius: 6PX;
+  font-size: 14PX;
+}
+.primary, .secondary {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
+  margin: 0;
+  padding: 6PX 12PX;
+  border: 1PX solid #cbdad0;
+  border-radius: 6PX;
+  line-height: 1.4;
+  font-size: 13PX;
+  background: white;
+  color: #274638;
+  cursor: pointer;
+}
+.primary { background: #226647; border-color: #226647; color: white; }
+.secondaryLabel { color: #274638; }
+.primary[disabled], .secondary[disabled] { opacity: 0.46; cursor: default; }
+.primary::after, .secondary::after, .selected::after, .question::after { border: 0; }
+@media (max-width: 760PX) {
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .conversation, .trace { min-height: 120PX; max-height: 52vh; }
+}

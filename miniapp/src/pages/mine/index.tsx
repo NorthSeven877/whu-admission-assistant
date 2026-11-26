@@ -79,8 +79,13 @@ export default function MinePage() {
             </Button>
           </View>
           <Text className={styles.fieldHint}>
-            需先在本机启动 DB-GPT 服务（默认端口 5670）
+            需先启动问答后端（默认端口 15670）
           </Text>
+          {process.env.TARO_ENV === 'h5' && (
+            <Button className={styles.ghostBtn} onClick={() => Taro.navigateTo({ url: '/pages/debug/index' })}>
+              <Text className={styles.ghostBtnText}>打开 ReAct 调试台</Text>
+            </Button>
+          )}
         </View>
       </View>
 

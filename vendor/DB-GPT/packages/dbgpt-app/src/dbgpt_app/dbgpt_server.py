@@ -67,6 +67,7 @@ def mount_routers(app: FastAPI):
     from dbgpt_app.openapi.api_v1.python_upload_api import (
         router as python_upload_router,
     )
+    from dbgpt_app.openapi.api_v1.whu_react import router as admission_router
     from dbgpt_app.openapi.api_v2 import router as api_v2
     from dbgpt_serve.agent.app.controller import router as gpts_v1
     from dbgpt_serve.agent.app.endpoints import router as app_v2
@@ -80,6 +81,7 @@ def mount_routers(app: FastAPI):
     app.include_router(python_upload_router, prefix="/api", tags=["PythonUpload"])
     app.include_router(examples_router, prefix="/api", tags=["Examples"])
     app.include_router(agentic_data_api, prefix="/api", tags=["AgenticData"])
+    app.include_router(admission_router, prefix="/api", tags=["Admissions"])
     app.include_router(dashboard_router, prefix="/api", tags=["Dashboards"])
 
     app.include_router(knowledge_router, prefix="/api/v1", tags=["Knowledge"])
@@ -286,10 +288,10 @@ def run_uvicorn(param: ServiceWebParameters):
     setup_http_service_logging()
 
     # https://github.com/encode/starlette/issues/617
-    cors_app = CORSMiddleware(
-        app=app,
-        **build_cors_config(param.cors_allowed_origins),
-    )
+    cors = build_cors_config(param.cors_allowed_origins)
+    if os.getenv("WHU_REACT_DEBUG") == "1" and param.host in {"localhost", "127.0.0.1", "::1"}:
+        cors["allow_origin_regex"] = r"https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?"
+    cors_app = CORSMiddleware(app=app, **cors)
     log_level = "info"
     if param.log:
         log_level = logging_str_to_uvicorn_level(param.log.level)

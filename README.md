@@ -13,18 +13,17 @@
 | 招生快报 | 生成某年度招生情况快报 | 聚合查询 + 结构化输出 |
 | 多轮追问 | 那 2023 年呢？ | 会话上下文复用 |
 
-数字类问题一律通过 SQL 查询数据库，不依赖语义检索生成数值，避免"看起来合理但实际错误"的答案。
+咨询页通过同一个 ReAct 循环处理问题。Qwen 规划查询，根据 SQL 与 GraphRAG 的结果继续查证、调整计划或作答。数字按数据库记录核对，政策按检索到的原文回答。
 
 ## 目录结构
 
 ```
 miniapp/                    小程序源码（Taro 项目）
   src/
-    pages/                  对话页、题库页、历史页、我的
+    pages/                  对话页、题库页、历史页、我的、H5 调试台
     components/             消息气泡、图表、品牌标识等
-    services/dbgpt.ts       与问答服务通信（SSE 流式）
+    services/admission.ts  招生 ReAct 事件流
     services/demo.ts        离线演示样例
-    utils/routeMode.ts      问题类型识别与引擎选择
     utils/answerFormat.ts   答案清洗与表格/图表格式化
     store/chatStore.ts      会话与消息状态
     **/__tests__/           前端单元测试（Vitest）
@@ -40,6 +39,10 @@ tests/
 ```
 
 ## 快速开始
+
+本机后端已配置时，双击仓库根目录的 `启动招生助手.cmd`。启动程序会检查后端、启动 H5 并打开浏览器。首次需要时会自动安装网页依赖。
+
+修改后端代码或问答提示词后，双击 `重启招生后端.cmd`。重启完成后，可在已打开的网页继续提问。
 
 克隆一次即可获得前端、GraphRAG、DB-GPT 和后端部署源码。
 
@@ -57,6 +60,8 @@ npm.cmd run dev:h5
 完整问答使用 Qwen、GraphRAG 政策检索和 PostgreSQL 数字查询。
 按 [后端启动说明](backend-deployment/README.md) 准备索引和本机配置后，
 前端默认连接 http://127.0.0.1:15670。
+
+使用 `start_local.ps1 -DebugConsole` 启动后端后，打开 [H5 ReAct 调试台](http://localhost:10086/#/pages/debug/index)，查看每次模型请求的上下文、公开输出、工具命令和返回结果。
 
 ## 测试
 

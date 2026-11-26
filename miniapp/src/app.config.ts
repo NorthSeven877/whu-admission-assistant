@@ -7,7 +7,8 @@ export default defineAppConfig({
     'pages/chat/index',
     'pages/questions/index',
     'pages/history/index',
-    'pages/mine/index'
+    'pages/mine/index',
+    ...(process.env.TARO_ENV === 'h5' ? ['pages/debug/index'] : []),
   ],
   window: {
     backgroundTextStyle: 'light',

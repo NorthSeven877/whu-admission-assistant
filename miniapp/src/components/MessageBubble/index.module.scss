@@ -93,6 +93,13 @@
   width: 100%;
 }
 
+@media (min-width: 768PX) {
+  .assistantRow .bubbleWrap,
+  .assistantBubble {
+    max-width: min(680PX, 70vw);
+  }
+}
+
 // 系统提示胶囊
 .noticeRow {
   display: flex;
