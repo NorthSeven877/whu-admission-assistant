@@ -9,7 +9,7 @@ const MODEL_NAME = 'qwen3.8-flash-next';
 export function getBaseUrl(): string {
   try {
     const v = Taro.getStorageSync('whu_base_url');
-    if (v === 'http://127.0.0.1:5670' || v === 'http://localhost:5670') return DEFAULT_BASE;
+    if (/^http:\/\/(?:127\.0\.0\.1|localhost):(?:5670|8767)\/?$/.test(v)) return DEFAULT_BASE;
     if (v) return v;
   } catch {}
   return DEFAULT_BASE;

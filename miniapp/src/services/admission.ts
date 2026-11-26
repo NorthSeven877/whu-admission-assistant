@@ -1,11 +1,11 @@
 
 import Taro from '@tarojs/taro';
 import { createUtf8Decoder, getBaseUrl } from '@/services/dbgpt';
-import type { AdmissionMessage, TraceEvent } from '@/types/admission';
+import type { AdmissionMessage, AnswerMeta, AnswerSource, TraceEvent } from '@/types/admission';
 
 export interface AdmissionCallbacks {
   onTrace: (event: TraceEvent) => void;
-  onAnswer: (answer: string) => void;
+  onAnswer: (answer: string, meta?: AnswerMeta) => void;
   onDone: () => void;
   onError: (error: Error, offline: boolean) => void;
 }
@@ -50,7 +50,19 @@ export function streamAdmission(
             break;
           case 'final':
             answered = true;
-            callbacks.onAnswer(event.content);
+            if (debug) {
+              callbacks.onAnswer(event.content);
+            } else {
+              const sources = Array.isArray(event.sources)
+                ? event.sources.filter((source: unknown): source is AnswerSource =>
+                  !!source && typeof source === 'object' && 'title' in source && typeof source.title === 'string' &&
+                  'kind' in source && (source.kind === 'document' || source.kind === 'database'))
+                : undefined;
+              callbacks.onAnswer(event.content, {
+                sources,
+                seconds: typeof event.seconds === 'number' ? event.seconds : undefined,
+              });
+            }
             break;
           case 'error':
             fail(event.message);

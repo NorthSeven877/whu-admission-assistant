@@ -4,6 +4,19 @@ export interface AdmissionMessage {
   content: string;
 }
 
+export interface AnswerSource {
+  title: string;
+  kind: 'document' | 'database';
+  url?: string;
+  date?: string;
+  text?: string;
+}
+
+export interface AnswerMeta {
+  sources?: AnswerSource[];
+  seconds?: number;
+}
+
 export type PromptMessage = { role: 'system' | AdmissionMessage['role']; content: string };
 
 export type TraceEvent =

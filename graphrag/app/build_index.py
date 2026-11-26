@@ -109,6 +109,14 @@ def build_bm25(chunks):
 
 
 def build_embeddings(chunks):
+    if os.environ.get("WHU_EMBED_PROVIDER") == "ollama":
+        from app import OLLAMA_MODEL, ollama_embeddings
+
+        texts = [chunk["text"] for chunk in chunks]
+        batches = [ollama_embeddings(texts[i:i + 16], timeout=45) for i in range(0, len(texts), 16)]
+        save_embeddings(np.concatenate(batches), provider="ollama", model=OLLAMA_MODEL)
+        return True
+
     try:
         import torch
         from transformers import AutoModel, AutoTokenizer
@@ -139,9 +147,15 @@ def build_embeddings(chunks):
             out[i:i + len(batch)] = h.numpy()
             if (i // bs) % 20 == 0:
                 print("  embed %d/%d  %.1fs" % (i, len(texts), time.time() - t0), file=sys.stderr)
-    np.save(os.path.join(DATA, "embeddings.npy"), out)
+    save_embeddings(out, provider="transformers", model=name)
     print("embeddings: %s -> %s  (%.1fs)" % (out.shape, name, time.time() - t0), file=sys.stderr)
     return True
+
+
+def save_embeddings(vectors, provider, model):
+    np.save(os.path.join(DATA, "embeddings.npy"), vectors)
+    with open(os.path.join(DATA, "embeddings.meta.json"), "w", encoding="utf-8") as f:
+        json.dump({"provider": provider, "model": model}, f, ensure_ascii=False)
 
 
 def build_graph(chunks):

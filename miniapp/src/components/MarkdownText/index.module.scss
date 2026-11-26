@@ -153,3 +153,12 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+:global(.whuChat) {
+  .markdown { font-size: 14PX; line-height: 1.75; overflow-wrap: anywhere; }
+  .paragraph { margin: 8PX 0; }
+  .heading.h1 { font-size: 20PX; }
+  .heading.h2 { font-size: 17PX; }
+  .heading.h3 { font-size: 15PX; }
+  .tableCell { min-width: 84PX; padding: 8PX 10PX; font-size: 12PX; line-height: 1.5; }
+}

@@ -1,8 +1,8 @@
-import type { TraceEvent } from './admission';
+import type { AnswerMeta, TraceEvent } from './admission';
 
 export type ChatMode = 'chat_knowledge' | 'chat_with_db_execute' | 'chat_with_db_react';
 
-export interface ChatMessage {
+export interface ChatMessage extends AnswerMeta {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;

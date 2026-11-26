@@ -8,171 +8,179 @@ import BrandMark from '@/components/BrandMark';
 import { questions, QuestionItem } from '@/data/questions';
 import styles from './index.module.scss';
 
-// 从题库里挑 6 个覆盖四类场景、且能稳定出数据/出答案的高频问题
-const ALL_QUESTIONS = questions.reduce<QuestionItem[]>((acc, g) => acc.concat(g.items), []);
+const ALL_QUESTIONS = questions.flatMap((group) => group.items);
 const QUICK_QUESTIONS = ['q1', 'q2', 'q14', 'q9', 'q12', 'q8']
-  .map((id) => ALL_QUESTIONS.find((q) => q.id === id))
-  .filter((q): q is QuestionItem => !!q);
+  .map((id) => ALL_QUESTIONS.find((question) => question.id === id))
+  .filter((question): question is QuestionItem => !!question);
+const CATEGORIES = ['通知公告', '招生政策', '保送生', '艺术类招生', '高水平运动队', '高水平艺术团', '强基计划', '农村学生自强计划', '港澳台招生'];
+const isWeb = process.env.TARO_ENV === 'h5';
 
-// 数据覆盖度统计（让用户感知智能体"知道什么"）
-const DATA_STATS = [
-  { value: '2018-2025', label: '录取数据' },
-  { value: '2021-2025', label: '招生计划' },
-  { value: '620+', label: '政策文档' },
-];
+function openSource(url: string) {
+  if (!/^https?:\/\//i.test(url)) return;
+  if (isWeb) window.open(url, '_blank', 'noopener,noreferrer');
+  else Taro.setClipboardData({ data: url });
+}
 
 export default function ChatPage() {
-  const current = useChatStore((s) => s.current);
-  const streaming = useChatStore((s) => s.streaming);
-  const sendMessage = useChatStore((s) => s.sendMessage);
-  const cancel = useChatStore((s) => s.cancel);
-
+  const { current, sessions, streaming, sendMessage, cancel, newSession, openSession } = useChatStore();
   const [input, setInput] = useState('');
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string>();
   const [scrollTop, setScrollTop] = useState(0);
   const scrollRef = useRef(0);
-
-  const scrollToBottom = () => {
-    scrollRef.current += 1;
-    setScrollTop(scrollRef.current * 100000);
-  };
+  const messages = current?.messages || [];
+  const latest = messages[messages.length - 1];
+  const sources = (messages.find((message) => message.id === selectedId) ?? latest)?.sources || [];
 
   useEffect(() => {
-    scrollToBottom();
-  }, [current?.messages.length, current?.messages[current.messages.length - 1]?.content]);
+    setScrollTop(++scrollRef.current * 100000);
+  }, [current?.convUid, messages.length, latest?.content, latest?.trace?.length]);
 
-  // 接收题库页跳转过来的问题
   useDidShow(() => {
-    try {
-      const pending = Taro.getStorageSync('whu_pending_question');
-      if (pending && pending.text) {
-        Taro.removeStorageSync('whu_pending_question');
-        setTimeout(() => {
-          sendMessage(pending.text);
-        }, 100);
-      }
-    } catch (e) {
-      console.error('[Chat] pending question error', e);
+    if (useChatStore.getState().streaming) return;
+    const pending = Taro.getStorageSync('whu_pending_question');
+    if (pending?.text) {
+      Taro.removeStorageSync('whu_pending_question');
+      setSelectedId(undefined);
+      sendMessage(pending.text);
     }
   });
 
-  const handleSend = () => {
-    const text = input.trim();
-    if (!text || streaming) return;
+  const ask = (text: string) => {
+    const question = text.trim();
+    if (!question || streaming) return;
     setInput('');
-    sendMessage(text);
+    setSelectedId(undefined);
+    sendMessage(question);
   };
 
-  const handleQuickAsk = (text: string) => {
-    if (streaming) return;
-    sendMessage(text);
+  const toggleDirectory = () => {
+    const width = isWeb ? window.innerWidth : Taro.getSystemInfoSync().windowWidth;
+    if (width >= 768) setLeftCollapsed(!leftCollapsed);
+    else { setLeftOpen(!leftOpen); setRightOpen(false); }
   };
 
-  const messages = current?.messages || [];
-  const isEmpty = messages.length === 0;
+  const toggleSources = (messageId?: string) => {
+    setLeftOpen(false);
+    setSelectedId(messageId);
+    setRightOpen(messageId ? true : !rightOpen);
+  };
 
   return (
-    <View className={styles.page}>
-      {isEmpty ? (
-        <ScrollView scrollY className={styles.emptyScroll}>
-          <View className={styles.welcome}>
-            {/* Hero 区：渐变背景 + 光晕 */}
-            <View className={styles.hero}>
-              <View className={classnames(styles.orb, styles.orbGreen)} />
-              <View className={classnames(styles.orb, styles.orbPink)} />
-
-              <View className={styles.logoWrap}>
-                <View className={styles.logoRing} />
-                <BrandMark size={136} />
-              </View>
-
-              <Text className={styles.welcomeTitle}>武汉大学招生咨询</Text>
-              <Text className={styles.welcomeDesc}>
-                招生政策、分数线、位次、招生计划，都可以直接问我
-              </Text>
-
-              {/* 数据覆盖度统计条 */}
-              <View className={styles.statsRow}>
-                {DATA_STATS.map((s, i) => (
-                  <View key={s.label} className={styles.statItem} style={{ animationDelay: `${i * 0.08}s` }}>
-                    <Text className={styles.statValue}>{s.value}</Text>
-                    <Text className={styles.statLabel}>{s.label}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* 快捷提问 */}
-            <View className={styles.quickSection}>
-              <View className={styles.quickHead}>
-                <View className={styles.quickBar} />
-                <Text className={styles.quickTitle}>试试这些问题</Text>
-              </View>
-              <View className={styles.quickList}>
-                {QUICK_QUESTIONS.map((q) => (
-                  <View
-                    key={q.id}
-                    className={styles.quickChip}
-                    onClick={() => handleQuickAsk(q.question)}
-                  >
-                    <View className={styles.quickChipDot} />
-                    <Text className={styles.quickChipText}>{q.question}</Text>
-                    <Text className={styles.quickChipArrow}>›</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView
-          scrollY
-          className={styles.messageScroll}
-          scrollTop={scrollTop}
-          scrollWithAnimation
-        >
-          <View className={styles.messageList}>
-            {messages.map((msg, idx) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                streaming={streaming && idx === messages.length - 1 && msg.role === 'assistant'}
-              />
-            ))}
-            <View className={styles.bottomSpacer} />
-          </View>
-        </ScrollView>
+    <View className={classnames('whuChat', styles.page, { [styles.leftCollapsed]: leftCollapsed })}
+      style={isWeb ? undefined : { height: Taro.getSystemInfoSync().windowHeight + 'px' }}>
+      {(leftOpen || rightOpen) && (
+        <View className={styles.backdrop} onClick={() => { setLeftOpen(false); setRightOpen(false); }} />
       )}
-
-      <View className={styles.inputBar}>
-        <View className={styles.inputWrap}>
-          <Textarea
-            className={styles.textarea}
-            value={input}
-            onInput={(e) => setInput(e.detail.value)}
-            placeholder="输入你的问题，政策、分数、计划都能问..."
-            placeholderClass={styles.placeholder}
-            autoHeight
-            maxlength={500}
-            cursorSpacing={16}
-            adjustPosition
-            showConfirmBar={false}
-            confirmType="send"
-            onConfirm={handleSend}
-          />
+      <View className={classnames(styles.leftSidebar, { [styles.drawerOpen]: leftOpen })}>
+        <View className={styles.brand}><BrandMark size={64} /><Text className={styles.brandTitle}>武大招生助手</Text></View>
+        <Button className={styles.newChat} disabled={streaming} onClick={() => {
+          newSession(); setSelectedId(undefined); setLeftOpen(false); setRightOpen(false); setInput('');
+        }}>新对话</Button>
+        <Text className={styles.sideHeading}>问题分类</Text>
+        <ScrollView scrollY className={styles.sidebarScroll}>
+          {CATEGORIES.map((name) => (
+            <View key={name} className={styles.category} onClick={() => {
+              setInput('请介绍武汉大学' + name + '的相关信息，并注明年份和来源。');
+              setLeftOpen(false);
+            }}>
+              <Text>{name}</Text><Text className={styles.categoryArrow}>›</Text>
+            </View>
+          ))}
+          <Text className={styles.sectionLabel}>最近对话</Text>
+          {sessions.slice(0, 8).map((session) => (
+            <View key={session.convUid}
+              className={classnames(styles.session, { [styles.sessionActive]: current?.convUid === session.convUid })}
+              onClick={() => {
+                if (streaming) return;
+                openSession(session.convUid);
+                setSelectedId(undefined);
+                setLeftOpen(false);
+              }}>{session.title}</View>
+          ))}
+          {!sessions.length && <Text className={styles.emptyHistory}>暂无历史对话</Text>}
+        </ScrollView>
+        <View className={styles.sideFooter}>
+          <Text onClick={() => Taro.switchTab({ url: '/pages/questions/index' })}>题库</Text>
+          <Text onClick={() => Taro.switchTab({ url: '/pages/mine/index' })}>连接设置</Text>
         </View>
-        {streaming ? (
-          <Button className={classnames(styles.sendBtn, styles.stopBtn)} onClick={cancel}>
-            <Text className={styles.sendBtnText}>停止</Text>
+      </View>
+
+      <View className={styles.workspace}>
+        <View className={styles.topbar}>
+          <View className={styles.titleGroup}>
+            <Button className={styles.menuButton} onClick={toggleDirectory}>目录</Button>
+            <Text className={styles.topTitle}>{current?.title || '招生咨询'}</Text>
+          </View>
+          <Button className={styles.sourcesToggle} onClick={() => toggleSources()}>
+            参考资料{sources.length ? ' · ' + sources.length : ''}
           </Button>
+        </View>
+
+        {messages.length ? (
+          <ScrollView scrollY className={styles.messageScroll} scrollTop={scrollTop} scrollWithAnimation>
+            <View className={styles.messageList}>
+              {messages.map((message, index) => (
+                <MessageBubble key={message.id} message={message}
+                  streaming={streaming && index === messages.length - 1 && message.role === 'assistant'}
+                  onSourcesClick={toggleSources} />
+              ))}
+            </View>
+          </ScrollView>
         ) : (
-          <Button
-            className={classnames(styles.sendBtn, { [styles.sendBtnDisabled]: !input.trim() })}
-            onClick={handleSend}
-            disabled={!input.trim()}
-          >
-            <Text className={styles.sendBtnText}>发送</Text>
-          </Button>
+          <ScrollView scrollY className={styles.emptyScroll}>
+            <View className={styles.welcome}>
+              <Text className={styles.welcomeTitle}>武汉大学招生咨询</Text>
+              <Text className={styles.welcomeDesc}>查询历年分数、位次与招生计划，了解招生政策和报考流程。</Text>
+              <View className={styles.quickList}>
+                {QUICK_QUESTIONS.map((question) => (
+                  <Button key={question.id} className={styles.quickCard} onClick={() => ask(question.question)}>
+                    <Text className={styles.cardQuestion}>{question.question}</Text>
+                    <Text className={styles.cardArrow}>↗</Text>
+                  </Button>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
         )}
+
+        <View className={styles.composerArea}>
+          <View className={styles.composer}>
+            <Textarea className={styles.textarea} value={input} onInput={(event) => setInput(event.detail.value)}
+              placeholder="问问招生政策、分数位次或招生计划…" placeholderClass={styles.placeholder}
+              autoHeight maxlength={1500} cursorSpacing={16} adjustPosition showConfirmBar={false}
+              confirmType="send" onConfirm={() => ask(input)} />
+            <View className={styles.composerBottom}>
+              {streaming && <Text className={styles.composerHint}>正在生成回答…</Text>}
+              <Button className={styles.sendBtn} disabled={!input.trim() && !streaming}
+                onClick={() => streaming ? cancel() : ask(input)}>{streaming ? '停止' : '发送'}</Button>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View className={classnames(styles.rightSidebar, { [styles.rightExpanded]: rightOpen })}>
+        <View className={styles.sourcesHead}>
+          <Text>本轮检索资料</Text>
+          <Button className={styles.closeSources} onClick={() => setRightOpen(false)}>收起</Button>
+        </View>
+        <ScrollView scrollY className={styles.evidenceScroll}>
+          {sources.length ? sources.map((source, index) => (
+            <View key={index} className={styles.sourceCard}>
+              <Text className={styles.sourceTag}>{source.kind === 'database' ? '数据库查询' : '文档 ' + (index + 1)}</Text>
+              <Text className={styles.sourceTitle}>{source.title}</Text>
+              {!!source.date && <Text className={styles.sourceDate}>{source.date}</Text>}
+              {!!source.text && <Text className={styles.sourceExcerpt}>{source.text}</Text>}
+              {!!source.url && /^https?:\/\//i.test(source.url) && (
+                <Button className={styles.sourceLink} onClick={() => openSource(source.url!)}>
+                  {isWeb ? '查看原文' : '复制原文链接'}
+                </Button>
+              )}
+            </View>
+          )) : <Text className={styles.noSources}>本轮暂无检索资料</Text>}
+        </ScrollView>
       </View>
     </View>
   );

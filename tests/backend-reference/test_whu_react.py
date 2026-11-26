@@ -55,14 +55,18 @@ class AdmissionReactTests(unittest.IsolatedAsyncioTestCase):
              "stop", "第一轮原生推理"),
             ('{"answer":"你好"}', "stop", "第二轮原生推理"),
         ]
+        document = {"title": "转专业政策", "url": "https://example.test/policy", "text": "资料正文"}
         with patch.object(react, "_model", new=AsyncMock(side_effect=responses)), patch.object(
-            react, "_run_tool", new=AsyncMock(return_value={"documents": []}),
+            react, "_run_tool", new=AsyncMock(return_value={"documents": [document]}),
         ) as tool:
             events = [json.loads(frame[6:]) async for frame in react._loop(request)]
         tool.assert_awaited_once()
         self.assertEqual([event["type"] for event in events],
                          ["start", "model.start", "model.result", "model.start", "model.result", "final", "done"])
         self.assertFalse(any({"messages", "output", "reasoning"} & event.keys() for event in events))
+        self.assertEqual(events[-2]["sources"][0]["title"], document["title"])
+        self.assertEqual(events[-2]["sources"][0]["url"], document["url"])
+        self.assertGreaterEqual(events[-2]["seconds"], 0)
 
     async def test_model_reads_native_reasoning_without_changing_public_json(self):
         action = '{"summary":"完成","answer":"你好"}'

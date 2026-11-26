@@ -12,6 +12,8 @@
 
 直接运行该脚本会从招生官网采集资料。采集版的覆盖范围取决于可访问的页面。已有 GraphRAG 格式的语料时，可先放到 graphrag/data/pages.jsonl。
 
+GraphRAG 默认使用 Transformers。如果本机用 Ollama，可在准备索引和启动后端的终端都设置 `WHU_EMBED_PROVIDER=ollama`。默认使用 `http://127.0.0.1:11434` 和 `bge-m3:latest`，可用 `WHU_OLLAMA_BASE_URL` 和 `WHU_OLLAMA_EMBED_MODEL` 覆盖。切换向量模型时先用同一模型重建索引，再重新启动 GraphRAG。
+
 ## 配置 PostgreSQL 和模型
 
 在 PostgreSQL 中创建空库 admission_agent，通过 psql 导入 backend-deployment/sql/schema.sql 和 backend-deployment/sql/seed.sql。导入脚本包含建表操作，应在新库上执行。为招生服务创建只读用户，并授予该库连接权限、public schema 使用权限以及招生表的 SELECT 权限。
@@ -34,7 +36,7 @@
 
 ## ReAct 调试台
 
-本机调试时，用 `.ackend-deploymentscriptsstart_local.ps1 -DebugConsole` 启动后端。如果 15670 上已经运行了 DB-GPT，需要重启该进程，以便读取调试开关。
+本机调试时，用 `.\backend-deployment\scripts\start_local.ps1 -DebugConsole` 启动后端。如果 15670 上已经运行了 DB-GPT，需要重启该进程，以便读取调试开关。
 
 在 H5 打开 [ReAct 调试台](http://localhost:10086/#/pages/debug/index)，也可以在「我的」页面进入。控制台与咨询页使用同一个 `POST /api/v1/chat/admission-react` 接口。控制台按轮次显示实际发送给模型的系统提示、会话历史、工具回填、公开输出、原生推理字段，以及 SQL 或 GraphRAG 的工具返回。原生推理单独记录在本次调试会话中，仅供本机查看，刷新后清空。
 

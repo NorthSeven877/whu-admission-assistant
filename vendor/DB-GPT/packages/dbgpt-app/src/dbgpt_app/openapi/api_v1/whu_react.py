@@ -195,14 +195,32 @@ async def _model(
     return content, choice.get("finish_reason"), reasoning
 
 
+def _answer_sources(tool: str, result: dict) -> list[dict]:
+    if tool == "sql_query":
+        return [{"title": "招生数据库", "kind": "database"}] if result.get("rows") else []
+    return [
+        {
+            "title": document["title"],
+            "kind": "document",
+            "url": document.get("url") or "",
+            "date": document.get("date") or "",
+            "text": (document.get("text") or "")[:280],
+        }
+        for document in result.get("documents", [])
+        if isinstance(document, dict) and isinstance(document.get("title"), str) and document["title"].strip()
+    ]
+
+
 async def _loop(req: AdmissionRequest):
     yield _event("start", model=MODEL)
     messages = [{"role": "system", "content": SYSTEM}]
     messages += [message.model_dump() for message in req.history]
     messages.append({"role": "user", "content": req.question.strip()})
-    deadline = time.monotonic() + 102
+    turn_started = time.monotonic()
+    deadline = turn_started + 102
     verify = os.getenv("WHU_LLM_VERIFY_SSL", "true").lower() != "false"
     seen = set()
+    sources = {}
 
     async with httpx.AsyncClient(verify=verify, trust_env=False) as client:
         for round_no in range(1, MAX_TOOL_ROUNDS + 2):
@@ -238,7 +256,11 @@ async def _loop(req: AdmissionRequest):
                 continue
             yield _event("model.result", round=round_no, summary=summary, elapsed_ms=elapsed, **details)
             if answer:
-                yield _event("final", content=answer)
+                if req.debug:
+                    yield _event("final", content=answer)
+                else:
+                    yield _event("final", content=answer, sources=list(sources.values()),
+                                 seconds=round(time.monotonic() - turn_started, 1))
                 yield _event("done")
                 return
 
@@ -275,6 +297,10 @@ async def _loop(req: AdmissionRequest):
                 if req.debug:
                     yield _event("tool.result", round=round_no, id=tool_id, result=result, executed=executed,
                                  elapsed_ms=round((time.monotonic() - started) * 1000))
+                else:
+                    for source in _answer_sources(tool, result):
+                        key = (source["title"], source.get("url"), source.get("date"))
+                        sources.setdefault(key, source)
                 observations.append({"id": tool_id, "tool": tool, "input": command, "result": result})
             messages.append({"role": "user", "content": "以下是本轮工具返回的资料（JSON）。请据此判断是否补查或回答。\n" + _json(observations)})
 

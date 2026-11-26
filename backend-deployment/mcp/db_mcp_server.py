@@ -27,7 +27,15 @@ import logging
 import os
 
 import psycopg2
-from mcp.server.fastmcp import FastMCP
+
+try:
+    from mcp.server.fastmcp import FastMCP
+    MCP_V2 = False
+except ModuleNotFoundError as exc:
+    if exc.name != "mcp.server.fastmcp":
+        raise
+    from mcp.server import MCPServer
+    MCP_V2 = True
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,12 +58,18 @@ PG_CONN_KW = {
 SERVER_HOST = os.environ.get("DB_MCP_HOST", "127.0.0.1")
 SERVER_PORT = int(os.environ.get("DB_MCP_PORT", "8765"))
 
-mcp = FastMCP(
-    name="admission-db-mcp",
-    instructions="湖北招生录取数据库（admission_agent）查询 MCP 服务器",
-    host=SERVER_HOST,
-    port=SERVER_PORT,
-)
+if MCP_V2:
+    mcp = MCPServer(
+        name="admission-db-mcp",
+        description="湖北招生录取数据库（admission_agent）查询 MCP 服务器",
+    )
+else:
+    mcp = FastMCP(
+        name="admission-db-mcp",
+        instructions="湖北招生录取数据库（admission_agent）查询 MCP 服务器",
+        host=SERVER_HOST,
+        port=SERVER_PORT,
+    )
 
 
 def _connect():
@@ -137,4 +151,7 @@ if __name__ == "__main__":
         SERVER_PORT,
         PG_CONN_KW["dbname"],
     )
-    mcp.run(transport="sse")
+    if MCP_V2:
+        mcp.run(transport="sse", host=SERVER_HOST, port=SERVER_PORT, sse_path="/sse")
+    else:
+        mcp.run(transport="sse")

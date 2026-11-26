@@ -25,6 +25,8 @@ LLM_MODEL = os.environ.get("WHU_LLM_MODEL", "qwen2.5-1.5b-instruct")
 LLM_API_KEY = os.environ.get("WHU_LLM_API_KEY", "")
 LLM_VERIFY_SSL = os.environ.get("WHU_LLM_VERIFY_SSL", "true").lower() != "false"
 EMBED_MODEL = os.environ.get("WHU_EMBED_MODEL", "BAAI/bge-small-zh-v1.5")
+EMBED_PROVIDER = os.environ.get("WHU_EMBED_PROVIDER", "transformers")
+OLLAMA_MODEL = os.environ.get("WHU_OLLAMA_EMBED_MODEL", "bge-m3:latest")
 TOP_DOCS = 3
 CHUNK_CHARS = 600
 
@@ -90,18 +92,26 @@ def load_resources():
     npy = os.path.join(DATA, "embeddings.npy")
     if os.path.exists(npy):
         embeddings = np.load(npy)
-        if embeddings.shape[0] != len(chunks):
+        if embeddings.ndim != 2 or embeddings.shape[0] != len(chunks):
             raise ValueError("Vector index and chunks differ; rebuild the GraphRAG index.")
-        try:
-            import torch
-            from transformers import AutoModel, AutoTokenizer
-            os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-            emb_tokenizer = AutoTokenizer.from_pretrained(EMBED_MODEL)
-            emb_model = AutoModel.from_pretrained(EMBED_MODEL)
-            emb_model.eval()
-        except Exception as e:
-            print("warn: embedding model unavailable: %s" % e, file=sys.stderr)
-            emb_tokenizer = emb_model = None
+        metadata = os.path.join(DATA, "embeddings.meta.json")
+        if os.path.exists(metadata):
+            with open(metadata, encoding="utf-8") as f:
+                expected = json.load(f)
+            if expected.get("provider") != EMBED_PROVIDER or (
+                EMBED_PROVIDER == "ollama" and expected.get("model") != OLLAMA_MODEL
+            ):
+                raise ValueError("Embedding provider/model differs from the vector index; rebuild the index or use its model.")
+        if EMBED_PROVIDER != "ollama":
+            try:
+                from transformers import AutoModel, AutoTokenizer
+                os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+                emb_tokenizer = AutoTokenizer.from_pretrained(EMBED_MODEL)
+                emb_model = AutoModel.from_pretrained(EMBED_MODEL)
+                emb_model.eval()
+            except Exception as e:
+                print("warn: embedding model unavailable: %s" % e, file=sys.stderr)
+                emb_tokenizer = emb_model = None
 
     print("loaded %d chunks / %d docs, bm25=%s, vectors=%s" % (
         len(chunks), len(doc_meta), bm25 is not None,
@@ -119,8 +129,29 @@ def tokenize(text):
     return [t for t in jieba.cut(text) if len(t.strip()) > 1 or t.isdigit()]
 
 
+def ollama_embeddings(texts, timeout):
+    base_url = os.environ.get("WHU_OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    response = requests.post(
+        base_url.rstrip("/") + "/api/embed",
+        json={"model": OLLAMA_MODEL, "input": texts},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    vectors = np.asarray(response.json()["embeddings"], dtype=np.float32)
+    if vectors.ndim != 2 or len(vectors) != len(texts) or not vectors.shape[1]:
+        raise ValueError("Ollama returned an invalid embedding batch.")
+    return vectors / np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-12)
+
+
 def embed_query(q):
-    if embeddings is None or emb_model is None:
+    if embeddings is None:
+        return None
+    if EMBED_PROVIDER == "ollama":
+        vector = ollama_embeddings([q], timeout=10)[0]
+        if len(vector) != embeddings.shape[1]:
+            raise ValueError("Query/document vector dimensions differ; use the index's embedding model.")
+        return vector
+    if emb_model is None:
         return None
     import torch
     with torch.no_grad():

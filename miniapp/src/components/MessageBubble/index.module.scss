@@ -186,3 +186,17 @@
     opacity: 0;
   }
 }
+
+:global(.whuChat) {
+  .messageRow { padding: 0; gap: 8PX; margin-bottom: 20PX; }
+  .avatarSlot { margin: 0; flex-shrink: 0; }
+  .assistantRow .bubbleWrap { flex: 1; min-width: 0; max-width: none; }
+  .assistantBubble { max-width: none; padding: 4PX 0; border: 0; box-shadow: none; }
+  .userRow .bubbleWrap { max-width: 83%; }
+  .userBubble { max-width: 100%; padding: 8PX 12PX; background: #e8f2ea; box-shadow: none; }
+  .userText { color: #263d31; font-size: 14PX; line-height: 1.6; }
+  .avatarUser { display: none; }
+  .answerActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8PX; color: #53675c; font-size: 12PX; }
+  .answerAction { width: auto; margin: 0; padding: 4PX 8PX; font-size: 12PX; line-height: 1.5; color: #286a47; background: #edf4ee; cursor: pointer; }
+  .answerAction::after { border: 0; }
+}

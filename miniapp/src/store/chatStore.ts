@@ -91,8 +91,8 @@ export const useChatStore = create<ChatState>((set, get) => {
             ...message, trace: [...(message.trace || []), event],
           }));
         },
-        onAnswer: (content) => {
-          if (!closed) patch({ content });
+        onAnswer: (content, meta) => {
+          if (!closed) patch({ content, ...meta });
         },
         onDone: finish,
         onError: (error, offline) => {
